@@ -1,0 +1,13 @@
+# Local kind cluster. Same manifests, no cloud identity, fake secret store, zero cost.
+name: kind
+display: kind (local)
+vars: {}
+service_account: {annotations: {}}
+pod_labels: {}
+secret_store: fake-secrets                   # External Secrets "fake" provider, see deploy/kind
+gateways:
+  public: {name: public, namespace: gateway-system}
+  internal: {name: internal, namespace: gateway-system}
+zones: 1
+spot: null
+pricing: {vcpu_hour: 0, gb_hour: 0, spot_discount: 0}

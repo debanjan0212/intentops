@@ -1,0 +1,38 @@
+{{- $sel := include "svc.sel" . }}
+{{- $m := printf "%s_count" .Values.sli.metric }}
+{{- $err := printf "%s,%s=~\"5..\"" $sel .Values.sli.statusLabel }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Values.name }}
+  {{- include "svc.meta" . | nindent 2 }}
+spec:
+  groups:
+    - name: {{ .Values.name }}-slo
+      rules:
+        {{- range .Values.slo.windows }}
+        - record: slo:sli_error:ratio_rate{{ . }}
+          labels:
+            namespace: {{ $.Values.team }}
+            service: {{ $.Values.name }}
+          expr: {{ printf "sum(rate(%s{%s}[%s])) / sum(rate(%s{%s}[%s]))" $m $err . $m $sel . | quote }}
+        {{- end }}
+        {{- /* multi-window, multi-burn-rate alerts (Google SRE Workbook, ch. 5) */}}
+        {{- range .Values.slo.burnAlerts }}
+        - alert: {{ $.Values.alertPrefix }}ErrorBudgetBurn
+          labels:
+            severity: {{ .severity }}
+            window: {{ .long }}
+          expr: {{ printf "slo:sli_error:ratio_rate%s{%s} > %s and slo:sli_error:ratio_rate%s{%s} > %s" .long $sel .threshold .short $sel .threshold | quote }}
+          annotations:
+            summary: {{ printf "%s is burning its %s%% error budget %sx too fast (%s/%s windows)" $.Values.name $.Values.slo.availability .burnRate .long .short | quote }}
+        {{- end }}
+        {{- if .Values.slo.latencyP95Ms }}
+        - alert: {{ .Values.alertPrefix }}LatencySLO
+          for: 10m
+          labels:
+            severity: ticket
+          expr: {{ printf "histogram_quantile(0.95, sum by (le) (rate(%s_bucket{%s}[5m]))) * 1000 > %v" .Values.sli.metric $sel .Values.slo.latencyP95Ms | quote }}
+          annotations:
+            summary: {{ printf "%s p95 latency is above %vms" .Values.name .Values.slo.latencyP95Ms | quote }}
+        {{- end }}

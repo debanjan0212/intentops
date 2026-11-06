@@ -1,0 +1,69 @@
+name: IntentOps
+description: Policy-check service intents and render versioned Helm charts, Kustomize overlays, plain manifests, Argo CD and Flux files for any cloud or bare metal.
+branding: {icon: layers, color: blue}
+inputs:
+  intents:
+    description: Glob of intent files
+    default: "intents/*.yaml"
+  cloud:
+    description: Platform profile (aws, gcp, azure, baremetal, kind, a custom one, or "all"). Empty = every platform for charts/overlays, the intent's own for manifests.
+    default: ""
+  format:
+    description: manifests, helm, kustomize, argocd, flux, or all
+    default: all
+  output:
+    description: Output directory
+    default: rendered
+  profiles:
+    description: Extra directory of platform profiles (adds or overrides platforms)
+    default: ""
+  repo_url:
+    description: GitOps repo URL used by the Argo CD / Flux files (chart expected at charts/<name>)
+    default: ""
+  chart_registry:
+    description: Optional OCI registry to push packaged charts to, e.g. oci://ghcr.io/acme/charts (log in to it before this step)
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with: {python-version: "3.12"}
+    - shell: bash
+      run: pip install --quiet "$GITHUB_ACTION_PATH"
+    - shell: bash
+      env:   # inputs go through env, never straight into the script (avoids script injection)
+        INTENTS: ${{ inputs.intents }}
+        CLOUD: ${{ inputs.cloud }}
+        FORMAT: ${{ inputs.format }}
+        OUTPUT: ${{ inputs.output }}
+        REPO_URL: ${{ inputs.repo_url }}
+        CHART_REGISTRY: ${{ inputs.chart_registry }}
+        INTENTOPS_PROFILES: ${{ inputs.profiles }}
+      run: |
+        status=0
+        args=()
+        [ -n "$CLOUD" ] && args=(--cloud "$CLOUD")
+        render=(--format "$FORMAT")
+        [ -n "$REPO_URL" ] && render+=(--repo-url "$REPO_URL")
+        [ -n "$CHART_REGISTRY" ] && render+=(--chart-repo "$CHART_REGISTRY")
+        shopt -s nullglob
+        for f in $INTENTS; do
+          intentops check "$f" "${args[@]}" --markdown >> "$GITHUB_STEP_SUMMARY" || status=1
+          { echo '```text'; intentops plan "$f" "${args[@]}"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          intentops render "$f" "${args[@]}" "${render[@]}" -o "$OUTPUT" || status=1
+        done
+        exit $status
+    - if: inputs.chart_registry != ''
+      uses: azure/setup-helm@v4
+    - if: inputs.chart_registry != ''
+      shell: bash
+      env:
+        OUTPUT: ${{ inputs.output }}
+        CHART_REGISTRY: ${{ inputs.chart_registry }}
+      run: |
+        # one immutable, versioned package per chart; Argo CD / Flux pin to that version
+        for chart in "$OUTPUT"/charts/*/; do
+          helm lint "$chart"
+          pkg=$(helm package "$chart" -d "$OUTPUT/packages" | awk '{print $NF}')
+          helm push "$pkg" "$CHART_REGISTRY"
+        done

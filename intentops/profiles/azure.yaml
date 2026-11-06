@@ -1,0 +1,17 @@
+# Azure AKS. Prices approximate a VM-based per-vCPU/GB split for a US region; update for your setup.
+name: azure
+display: Azure AKS
+vars: {client_id: 00000000-0000-0000-0000-000000000000}
+service_account:
+  annotations:
+    azure.workload.identity/client-id: "{client_id}"     # Entra Workload ID
+pod_labels:
+  azure.workload.identity/use: "true"
+secret_store: azure-key-vault
+secret_key: "{team}-{name}-{secret}"     # Key Vault names: letters, digits and - only
+gateways:                                    # Application Gateway for Containers
+  public: {name: public, namespace: gateway-system}
+  internal: {name: internal, namespace: gateway-system}
+zones: 3
+spot: {key: kubernetes.azure.com/scalesetpriority, value: spot, taint: true}
+pricing: {vcpu_hour: 0.0400, gb_hour: 0.0045, spot_discount: 0.6}

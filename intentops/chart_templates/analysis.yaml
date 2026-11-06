@@ -1,0 +1,33 @@
+{{- if eq .Values.release "canary" }}
+{{- /* "{{args.canary-hash}}" is Argo Rollouts syntax, kept as a literal string here */}}
+{{- $csel := printf "%s,rollouts_pod_template_hash=\"%s\"" (include "svc.sel" .) "{{args.canary-hash}}" }}
+{{- $cerr := printf "%s,%s=~\"5..\"" $csel .Values.sli.statusLabel }}
+{{- $nodata := "len(result) == 0 || isNaN(result[0])" }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ .Values.name }}-slo
+  {{- include "svc.meta" . | nindent 2 }}
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    - name: error-ratio
+      interval: 1m
+      failureLimit: 1
+      successCondition: {{ printf "%s || result[0] <= %s" $nodata .Values.slo.canaryMaxErrorRatio | quote }}
+      provider:
+        prometheus:
+          address: {{ .Values.platform.prometheusUrl }}
+          query: {{ printf "sum(rate(%s_count{%s}[2m])) / sum(rate(%s_count{%s}[2m]))" .Values.sli.metric $cerr .Values.sli.metric $csel | quote }}
+    {{- if .Values.slo.latencyP95Ms }}
+    - name: p95-latency-ms
+      interval: 1m
+      failureLimit: 1
+      successCondition: {{ printf "%s || result[0] <= %v" $nodata .Values.slo.latencyP95Ms | quote }}
+      provider:
+        prometheus:
+          address: {{ .Values.platform.prometheusUrl }}
+          query: {{ printf "histogram_quantile(0.95, sum by (le) (rate(%s_bucket{%s}[2m]))) * 1000" .Values.sli.metric $csel | quote }}
+    {{- end }}
+{{- end }}

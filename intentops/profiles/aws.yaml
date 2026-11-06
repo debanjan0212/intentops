@@ -1,0 +1,17 @@
+# Amazon EKS. Fill `vars` for your account. Prices are approximate on-demand list prices per
+# vCPU-hour and GB-hour (Fargate-style split) for a US region: update them for your region/discounts.
+name: aws
+display: Amazon EKS
+vars: {account_id: "123456789012", region: us-east-1}
+service_account:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::{account_id}:role/{team}-{name}"   # IRSA
+pod_labels: {}
+secret_store: aws-secrets-manager            # External Secrets ClusterSecretStore
+secret_key: "{team}/{name}/{secret}"
+gateways:                                    # shared Gateway API gateways (AWS Load Balancer Controller)
+  public: {name: public, namespace: gateway-system}
+  internal: {name: internal, namespace: gateway-system}
+zones: 3
+spot: {key: eks.amazonaws.com/capacityType, value: SPOT, taint: false}
+pricing: {vcpu_hour: 0.0405, gb_hour: 0.0044, spot_discount: 0.6}

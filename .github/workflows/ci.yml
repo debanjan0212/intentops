@@ -1,0 +1,49 @@
+name: ci
+on:
+  push: {branches: [main]}
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: azure/setup-helm@v4
+      - name: Install kustomize
+        run: |
+          curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz | tar xz
+          sudo mv kustomize /usr/local/bin/
+      - run: pip install -e ".[dev]"
+      - run: ruff check . && ruff format --check .
+      # includes: helm template == plain manifests, kustomize build == plain manifests, for every platform
+      - run: pytest -q
+
+  # Dogfood the reusable action on the examples, every format, every platform
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with: {intents: "examples/*.yaml", format: all, output: rendered, repo_url: "https://github.com/${{ github.repository }}.git"}
+      - uses: azure/setup-helm@v4
+      - name: Lint charts and render every platform
+        run: |
+          mkdir -p rendered/helm-out
+          for chart in rendered/charts/*/; do
+            name=$(basename "$chart")
+            for values in "$chart"values-*.yaml; do
+              helm lint "$chart" -f "$values"
+              helm template "$name" "$chart" -f "$values" > "rendered/helm-out/$name-$(basename "$values")"
+            done
+          done
+      - name: Validate everything against Kubernetes + CRD schemas
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          ./kubeconform -strict -summary -ignore-filename-pattern 'kustomization.yaml|Chart.yaml|values.*yaml|/overlays/|/templates/' \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered/manifests rendered/helm-out rendered/argocd rendered/flux rendered/kustomize/*/base
+      - uses: actions/upload-artifact@v4
+        with: {name: rendered, path: rendered}

@@ -1,0 +1,12 @@
+{{- if ge (int .Values.replicas.min) 2 }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.name }}
+  {{- include "svc.meta" . | nindent 2 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "svc.selector" . | nindent 6 }}
+{{- end }}

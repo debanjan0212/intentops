@@ -1,0 +1,9 @@
+{{- /* Off by default: with `helm install --create-namespace` or Argo CD/Flux the namespace is managed outside the chart. */}}
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.team }}
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+{{- end }}

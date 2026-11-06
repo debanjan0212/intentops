@@ -1,0 +1,16 @@
+# Google GKE. Prices approximate GKE Autopilot list prices (us-central1); update for your setup.
+name: gcp
+display: Google GKE
+vars: {project: my-gcp-project, region: us-central1}
+service_account:
+  annotations:
+    iam.gke.io/gcp-service-account: "{team}-{name}@{project}.iam.gserviceaccount.com"   # Workload Identity
+pod_labels: {}
+secret_store: gcp-secret-manager
+secret_key: "{team}-{name}-{secret}"     # Secret Manager names: letters, digits, - and _ only
+gateways:                                    # GKE Gateway controller
+  public: {name: public, namespace: gateway-system}
+  internal: {name: internal, namespace: gateway-system}
+zones: 3
+spot: {key: cloud.google.com/gke-spot, value: "true", taint: true}
+pricing: {vcpu_hour: 0.0445, gb_hour: 0.0049, spot_discount: 0.6}

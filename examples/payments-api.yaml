@@ -1,0 +1,20 @@
+# A prod payments API. Render it for any cloud: intentops render examples/payments-api.yaml --cloud all
+name: payments-api
+team: payments
+image: ghcr.io/acme/payments-api@sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+port: 8080
+cloud: aws
+environment: prod
+exposure: public
+hostname: pay.acme.example
+data_classification: pii
+slo:
+  availability: 99.95
+  latency_p95_ms: 250
+traffic:
+  peak_rps: 400
+  rps_per_replica: 80
+resources: {cpu: 500m, memory: 512Mi}
+secrets: [stripe-api-key, db-password]
+dependencies: [ledger, fraud-check]
+budget_usd_month: 400

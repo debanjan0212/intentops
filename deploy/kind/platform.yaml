@@ -1,0 +1,14 @@
+# Platform pieces a real cluster would already have. On a cloud these come from your platform team:
+# AWS Secrets Manager / GCP Secret Manager / Azure Key Vault stores, and a Gateway controller.
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata: {name: fake-secrets}
+spec:
+  provider:
+    fake:
+      data:
+        - {key: demo/podinfo/api-token, value: local-dev-token}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: gateway-system}

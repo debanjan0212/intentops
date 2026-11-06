@@ -1,0 +1,15 @@
+# Runs on the local kind lab (deploy/kind). podinfo exposes Prometheus metrics with its own names,
+# so the SLI section points at them.
+name: podinfo
+team: demo
+image: ghcr.io/stefanprodan/podinfo:6.7.1
+port: 9898
+cloud: kind
+environment: dev
+exposure: internal
+slo:
+  availability: 99.5
+  latency_p95_ms: 300
+traffic: {peak_rps: 20, rps_per_replica: 50}
+sli: {metric: http_request_duration_seconds, status_label: status}
+secrets: [api-token]

@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: loadgen, namespace: demo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: loadgen}}
+  template:
+    metadata: {labels: {app: loadgen}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 100, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.11.1
+          command: ["sh", "-c", "while true; do curl -s -o /dev/null http://podinfo.demo/; sleep 0.1; done"]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          resources: {requests: {cpu: 10m, memory: 16Mi}, limits: {memory: 32Mi}}

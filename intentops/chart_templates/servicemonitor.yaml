@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.name }}
+  {{- include "svc.meta" . | nindent 2 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "svc.selector" . | nindent 6 }}
+  # lets canary metrics be told apart from the stable version
+  podTargetLabels:
+    - rollouts-pod-template-hash
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

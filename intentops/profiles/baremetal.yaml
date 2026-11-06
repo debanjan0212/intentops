@@ -1,0 +1,18 @@
+# Your own servers (kubeadm, k3s, RKE2, OpenShift, Talos...). No cloud identity: pods authenticate to
+# Vault with their Kubernetes service account. Any Gateway API controller works (Cilium, Envoy Gateway,
+# NGINX Gateway Fabric) behind MetalLB or your own load balancer.
+name: baremetal
+display: Bare metal (own servers)
+vars: {}
+service_account: {annotations: {}}
+pod_labels: {}
+secret_store: vault-backend                  # External Secrets ClusterSecretStore for HashiCorp Vault
+secret_key: "{team}/{name}/{secret}"         # Vault KV paths allow "/"
+gateways:
+  public: {name: public, namespace: gateway-system}
+  internal: {name: internal, namespace: gateway-system}
+zones: 1                                     # set to 3 if your nodes carry topology.kubernetes.io/zone labels per rack/room
+spot: null
+# EXAMPLE amortised cost of owned hardware (servers over 3 years + power + rack space), per vCPU-hour
+# and GB-hour. Replace with your own numbers; the budget gate and `compare` use them.
+pricing: {vcpu_hour: 0.010, gb_hour: 0.0012, spot_discount: 0}

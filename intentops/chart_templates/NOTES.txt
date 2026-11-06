@@ -1,0 +1,9 @@
+{{ .Values.name }} {{ .Chart.AppVersion }} (chart {{ .Chart.Version }}) is installed for team {{ .Values.team }}.
+
+Platform profile: {{ .Values.platform.name | default "portable defaults" }}
+Release strategy: {{ .Values.release }}{{ if eq .Values.release "canary" }} (10% -> 50% -> 100%, gated by SLO analysis){{ end }}
+SLO: {{ .Values.slo.availability }}% availability{{ if .Values.slo.latencyP95Ms }}, p95 under {{ .Values.slo.latencyP95Ms }} ms{{ end }}
+
+Check it:
+  kubectl -n {{ .Values.team }} get {{ if eq .Values.release "canary" }}rollout{{ else }}deployment{{ end }},hpa,svc -l app.kubernetes.io/name={{ .Values.name }}
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

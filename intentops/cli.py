@@ -67,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         intent, notes = agent.draft_intent(a.request)
         text = "".join(f"# {n}\n" for n in notes) + yaml.safe_dump(intent.model_dump(exclude_defaults=True), sort_keys=False)
         if a.out:
+            Path(a.out).parent.mkdir(parents=True, exist_ok=True)
             Path(a.out).write_text(text)
         else:
             print(text, end="")

@@ -41,6 +41,162 @@ gcp         4-12        72.12     216.37
 kind        4-12         0.00       0.00
 ```
 
+## Start here
+
+This section is written for anyone, including people new to Kubernetes. Go step by step and stop at the step you need.
+
+### What you need
+
+| What you want to do | What you need |
+|---|---|
+| **Try it**: plan, compare clouds, check policy, render files | Python 3.11 or newer, Git |
+| **Build Helm charts and Kustomize output** | the above. To deploy or test those outputs, also [Helm](https://helm.sh/docs/intro/install/) 3 and [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/) |
+| **Run the full lab** with real canary releases | Docker (give it about 8 GB of memory), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), [kubectl](https://kubernetes.io/docs/tasks/tools/) and Helm |
+| **Write intents from plain English with an AI model** | optional: an API key from any OpenAI-compatible provider, or [Ollama](https://ollama.com) (free). Without one, a built-in parser handles common phrasing. |
+| **Deploy to your real cluster** | a cluster with a few standard add-ons and a little cloud setup; see step 5 |
+
+New to these tools? Docker runs containers. kind runs a small Kubernetes cluster inside Docker. kubectl and Helm are the standard Kubernetes command-line tools. On Windows, use WSL2.
+
+### Step 1: try it (5 minutes, nothing else needed)
+
+```bash
+git clone https://github.com/debanjan0212/intentops.git
+cd intentops
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+intentops plan examples/payments-api.yaml               # replicas, error budget, alerts, canary rules, cost
+intentops compare examples/payments-api.yaml            # the same service priced on every cloud
+intentops check examples/payments-api.yaml              # the policy gate (exits 1 if anything fails)
+intentops render examples/payments-api.yaml --cloud all --format all -o out   # every file, for every platform
+make test
+```
+
+Open the `out/` folder to see what was produced.
+
+### Step 2: describe your own service
+
+Copy `examples/payments-api.yaml` and change the values, or let IntentOps write the first draft from a sentence:
+
+```bash
+intentops draft "an internal service called ledger for the finance team on GKE, 99.9%, 150 rps, confidential data, image ghcr.io/acme/ledger:1.0.0" -o intents/ledger.yaml
+```
+
+Lines starting with `# assumed` at the top of the file show what it had to guess. Check them and fix anything that is wrong.
+
+| Field | What it means | Allowed values (default) |
+|---|---|---|
+| `name`, `team` | service name; the team is also the namespace | lowercase letters, digits and `-` |
+| `image` | the container image to run | a tag, or better a `@sha256:` digest for prod |
+| `cloud` | where it runs | `aws`, `gcp`, `azure`, `baremetal`, `kind`, or your own profile (`kind`) |
+| `environment` | stage | `dev`, `staging`, `prod` (`prod`) |
+| `exposure` | who can reach it | `public` (internet), `internal` (inside the company), `private` (only inside the cluster) (`internal`) |
+| `hostname` | public URL host | needed when `exposure: public` |
+| `data_classification` | how sensitive the data is | `public`, `internal`, `confidential`, `pii` (`internal`) |
+| `slo` | the promise to users | `availability` in %, `latency_p95_ms` (99.9, 300) |
+| `traffic` | load | `peak_rps`, and `rps_per_replica` that one pod can serve (50, 50) |
+| `resources` | per pod | `cpu`, `memory` (`250m`, `256Mi`) |
+| `release` | how new versions roll out | `canary` or `rolling` (`canary`) |
+| `secrets` | names of secrets in your secret manager (never the values) | list |
+| `dependencies` | in-cluster services it calls | list |
+| `budget_usd_month` | monthly budget for the policy gate | number |
+| `port`, `health_path` | where the app listens and its health check | (`8080`, `/healthz`) |
+| `chart_version` | Helm chart version; bump it on every change | semver (`0.1.0`) |
+
+Then run `plan`, `check` and `render` on your file, as in step 1.
+
+### Step 3: the full lab on your laptop (free)
+
+```bash
+make up            # kind cluster with Argo Rollouts, Prometheus, External Secrets, Gateway API and metrics-server,
+                   # then renders examples/podinfo-kind.yaml and deploys it (5-10 min the first time)
+make release-good  # a healthy release: canary 10% -> 50% -> 100%
+make release-bad   # a broken release: the SLO check fails and Argo Rollouts rolls it back
+kubectl -n demo get rollout,analysisrun -w
+make down          # delete the lab
+```
+
+No `make` on your machine? Every target is one line in the `Makefile`.
+
+### Step 4: connect an AI model (optional)
+
+The model is only used to turn a sentence into an intent and to explain canary results. Plans, files and release decisions never depend on it. Set `INTENTOPS_LLM=openai` plus these three values:
+
+| Provider | `INTENTOPS_LLM_BASE_URL` | `INTENTOPS_MODEL` | `INTENTOPS_LLM_API_KEY` |
+|---|---|---|---|
+| DeepSeek | `https://api.deepseek.com` | `deepseek-flash` | your DeepSeek key |
+| OpenAI | `https://api.openai.com/v1` | any chat model on your account | your OpenAI key |
+| Ollama (free, runs locally) | `http://localhost:11434/v1` | e.g. `qwen2.5:7b` (run `ollama pull qwen2.5:7b` first) | leave empty |
+| Anthropic, Azure OpenAI, Bedrock, Vertex | run a [LiteLLM](https://docs.litellm.ai/) proxy and use its URL | the model name in the proxy | the proxy's key |
+
+```bash
+export INTENTOPS_LLM=openai INTENTOPS_LLM_BASE_URL=http://localhost:11434/v1 INTENTOPS_MODEL=qwen2.5:7b
+intentops draft "a public service called search-api for the web team on AWS, 99.95%, 800 rps" -o intents/search.yaml
+```
+
+### Step 5: deploy to your real cluster (EKS, GKE, AKS, bare metal)
+
+**1. Your cluster needs these add-ons.** Most platform teams already have them.
+
+| Add-on | Why | Needed when |
+|---|---|---|
+| [Prometheus Operator](https://github.com/prometheus-operator/kube-prometheus) (for example kube-prometheus-stack) | SLO alerts (`PrometheusRule`), scraping (`ServiceMonitor`), canary checks | always |
+| [Argo Rollouts](https://argo-rollouts.readthedocs.io/) | canary releases gated by the SLO | `release: canary` (the default) |
+| [metrics-server](https://github.com/kubernetes-sigs/metrics-server) | the autoscaler (HPA) | always |
+| [External Secrets Operator](https://external-secrets.io/) with a `ClusterSecretStore` (name below) | pulls secrets from your secret manager | the intent lists `secrets` |
+| [Gateway API](https://gateway-api.sigs.k8s.io/) and a controller, with Gateways named `public` and `internal` in namespace `gateway-system` | routing traffic in | `exposure` is `public` or `internal` |
+| Argo CD or Flux | GitOps deploys | only if you use `--format argocd` or `flux` |
+
+Your app must also expose the HTTP histogram `http_server_request_duration_seconds` with an `http_response_status_code` label (the OpenTelemetry standard names). If yours differ, set `sli.metric` and `sli.status_label` in the intent.
+
+**2. Your cloud account needs a little setup per service.** `<team>` and `<name>` come from the intent.
+
+| Platform | Identity for the pod | Secret store | Secret names | Ingress controller |
+|---|---|---|---|---|
+| AWS EKS | IRSA: an IAM OIDC provider for the cluster, and an IAM role `<team>-<name>` that trusts the service account `<name>` in namespace `<team>` | `aws-secrets-manager` | `<team>/<name>/<secret>` | AWS Load Balancer Controller (Gateway API) |
+| Google GKE | Workload Identity on the cluster, a Google service account `<team>-<name>@<project>.iam.gserviceaccount.com`, and the `roles/iam.workloadIdentityUser` binding | `gcp-secret-manager` | `<team>-<name>-<secret>` | GKE Gateway controller |
+| Azure AKS | OIDC issuer and Workload Identity on the cluster, a managed identity with a federated credential for the service account | `azure-key-vault` | `<team>-<name>-<secret>` | Application Gateway for Containers |
+| Bare metal | none needed | `vault-backend` (HashiCorp Vault) | Vault KV path `<team>/<name>/<secret>` | any Gateway API controller (Cilium, Envoy Gateway, NGINX Gateway Fabric) plus MetalLB or your own load balancer |
+
+The identity also needs permission to read its secrets (for example `secretsmanager:GetSecretValue` on AWS).
+
+**3. Put your account details in a profile.** The built-in profiles use example values (account `123456789012`, project `my-gcp-project`, an all-zero Azure client ID). Copy the one you need and fill in your own:
+
+```bash
+mkdir -p platform/profiles
+cp intentops/profiles/aws.yaml platform/profiles/aws.yaml   # edit vars: account_id, region (and prices if you like)
+export INTENTOPS_PROFILES=platform/profiles                  # your copy now overrides the built-in one
+```
+
+**4. Render and deploy the way your team works:**
+
+```bash
+intentops render intents/ledger.yaml --cloud gcp --format helm -o rendered
+helm upgrade --install ledger rendered/charts/ledger -n finance --create-namespace -f rendered/charts/ledger/values-gcp.yaml
+
+# or Kustomize:          kubectl apply -k rendered/kustomize/ledger/overlays/gcp
+# or plain manifests:    kubectl apply -k rendered/manifests/gcp/ledger
+# or GitOps:             --format argocd --repo-url <your GitOps repo>   (or --format flux), then commit the output
+```
+
+### All settings
+
+| Setting | What it does |
+|---|---|
+| `INTENTOPS_LLM` | `openai` to use a model for drafting and explanations; unset means offline |
+| `INTENTOPS_LLM_BASE_URL`, `INTENTOPS_MODEL`, `INTENTOPS_LLM_API_KEY` | which model to call (see step 4) |
+| `INTENTOPS_PROFILES` | folders with your own cloud profiles (separate several with `:`) |
+
+### Something not working?
+
+| Problem | What to check |
+|---|---|
+| `intentops: command not found` | activate the virtualenv (`source .venv/bin/activate`) or run `python -m intentops` |
+| `check` fails | read the ❌ lines: each one names the rule and what to change in the intent |
+| pods stuck on `CreateContainerConfigError` | the External Secrets store name and the secret names in step 5 |
+| `no matches for kind "Rollout"` (or `PrometheusRule`, `ExternalSecret`, `HTTPRoute`) | that add-on from step 5 is missing |
+| canary never moves | Prometheus scrapes the app and the metric names match `sli` |
+
 ## How it works
 
 ```mermaid
@@ -148,31 +304,6 @@ Exit codes are 0/2/1, so a pipeline can gate on it.
 ## Policy gate
 
 Pinned image (digest recommended for prod) · HA replicas for 99.9%+ · PodDisruptionBudget · baseline cost within budget (and a warning if peak scale is not) · non-root · hardened container · resource requests · readiness probe · egress lock for sensitive data · warning for public sensitive services · hostname on public routes · canary for prod 99.9%+ · secrets are references, not values.
-
-## Quick start (no cluster, no API key)
-
-```bash
-pip install -e ".[dev]"
-make demo     # draft from English, plan, compare clouds, render for all clouds into out/
-make test     # 44 tests (helm/kustomize equivalence ones need helm and kustomize on PATH)
-```
-
-With a model (any OpenAI-compatible endpoint, including Ollama locally):
-
-```bash
-export INTENTOPS_LLM=openai INTENTOPS_LLM_BASE_URL=http://localhost:11434/v1 INTENTOPS_MODEL=qwen2.5:7b
-intentops draft "internal ledger service for the finance team on GKE, 99.9%, 150 rps, confidential data" -o intents/ledger.yaml
-```
-
-## Full lab on kind (free, local)
-
-```bash
-make up            # Argo Rollouts, kube-prometheus-stack, External Secrets, Gateway API CRDs, metrics-server
-                   # then renders examples/podinfo-kind.yaml and applies it
-make release-good  # canary 10% -> 50% -> 100%
-make release-bad   # podinfo random-error mode: AnalysisRun fails, Argo Rollouts rolls back
-kubectl -n demo get rollout,analysisrun -w
-```
 
 ## Use it in any repo (GitHub Action)
 

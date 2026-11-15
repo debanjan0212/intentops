@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
 import urllib.request
 
 from pydantic import ValidationError
@@ -30,8 +31,11 @@ def chat(messages: list[dict]) -> str | None:
     if key := os.getenv("INTENTOPS_LLM_API_KEY"):
         headers["Authorization"] = f"Bearer {key}"
     body = {"model": os.environ["INTENTOPS_MODEL"], "messages": messages, "temperature": 0}
+    # The base URL comes from the environment. urllib would also open file:// or ftp://, so say no to those.
+    if urllib.parse.urlsplit(base).scheme.lower() not in ("http", "https"):
+        raise ValueError("INTENTOPS_LLM_BASE_URL must be an http or https URL")
     req = urllib.request.Request(f"{base}/chat/completions", data=json.dumps(body).encode(), headers=headers)
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310
         return json.load(resp)["choices"][0]["message"]["content"]
 
 

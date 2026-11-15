@@ -4,6 +4,7 @@
 An AI agent can draft the intent from plain English, and any AI assistant can drive the whole thing over MCP. The model never writes YAML: it fills a typed schema, and a deterministic compiler does the rest.
 
 ![ci](https://github.com/debanjan0212/intentops/actions/workflows/ci.yml/badge.svg)
+![security](https://github.com/debanjan0212/intentops/actions/workflows/security.yml/badge.svg)
 
 ```yaml
 # examples/payments-api.yaml (the whole input)

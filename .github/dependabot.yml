@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  # keeps the SHA pins in .github/workflows and action.yml current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

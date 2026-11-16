@@ -14,6 +14,10 @@ import yaml
 from intentops.plan import Plan, load_profile, make_plan
 from intentops.schema import ServiceIntent
 
+# Where the rendered pod gets its writable emptyDir (its root filesystem is read-only).
+# A path inside the container, not a temp file on this machine, hence the Bandit note.
+POD_TMP = "/tmp"  # nosec B108
+
 
 class _NoAliases(yaml.SafeDumper):
     def ignore_aliases(self, data):
@@ -150,7 +154,7 @@ def _workload(intent, plan, profile, metadata, selector, labels, kind) -> dict:
             "limits": {"memory": intent.resources.memory},
         },
         "securityContext": {"allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
-        "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}],
+        "volumeMounts": [{"name": "tmp", "mountPath": POD_TMP}],
     }
     if intent.secrets:
         container["envFrom"] = [{"secretRef": {"name": f"{intent.name}-secrets"}}]

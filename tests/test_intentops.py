@@ -141,3 +141,17 @@ def test_mcp_tools_are_read_only_and_work():
     tools, result = asyncio.run(run())
     assert all(t.annotations.read_only_hint for t in tools)
     assert result["passed"] is True
+
+
+def test_model_url_must_be_http(monkeypatch):
+    # The base URL is configuration. A file:// or ftp:// value must be refused, not opened.
+    import pytest
+
+    from intentops import agent
+
+    monkeypatch.setenv("INTENTOPS_LLM", "openai")
+    monkeypatch.setenv("INTENTOPS_MODEL", "any")
+    for url in ("file:///etc", "ftp://example.com"):
+        monkeypatch.setenv("INTENTOPS_LLM_BASE_URL", url)
+        with pytest.raises(ValueError, match="http or https"):
+            agent.chat([{"role": "user", "content": "hi"}])

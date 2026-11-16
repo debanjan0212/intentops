@@ -53,8 +53,8 @@ def main(argv: list[str] | None = None) -> int:
             sp.add_argument("--markdown", action="store_true", help="GitHub step-summary format")
     c = sub.add_parser("canary", help="judge a canary: exit 0 promote, 2 pause, 1 rollback")
     c.add_argument("--intent", required=True)
-    c.add_argument("--baseline", required=True, help='JSON: {"requests": n, "errors": n, "p95_ms": x}')
-    c.add_argument("--canary", required=True)
+    c.add_argument("--baseline", required=True, help='path to a JSON file: {"requests": n, "errors": n, "p95_ms": x}')
+    c.add_argument("--canary", required=True, help="path to a JSON file in the same shape")
     sub.add_parser("mcp", help="run the MCP server (stdio)")
     a = p.parse_args(argv)
 

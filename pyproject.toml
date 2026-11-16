@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 dependencies = ["pydantic>=2.7", "pyyaml>=6.0", "mcp>=2.3,<3"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=9.2.0", "ruff>=0.6"]
 
 [project.scripts]
 intentops = "intentops.cli:main"

@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - name: Install kustomize
         run: |
           curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz | tar xz
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./
         with: {intents: "examples/*.yaml", format: all, output: rendered, repo_url: "https://github.com/${{ github.repository }}.git"}
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - name: Lint charts and render every platform
         run: |
           mkdir -p rendered/helm-out

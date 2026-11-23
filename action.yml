@@ -27,7 +27,7 @@ runs:
   using: composite
   steps:
     # pinned to commit SHAs: a tag can be moved, a SHA cannot
-    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with: {python-version: "3.12"}
     - shell: bash
       run: pip install --quiet "$GITHUB_ACTION_PATH"
@@ -55,7 +55,7 @@ runs:
         done
         exit $status
     - if: inputs.chart_registry != ''
-      uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+      uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
     - if: inputs.chart_registry != ''
       shell: bash
       env:

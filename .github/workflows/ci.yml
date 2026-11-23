@@ -7,10 +7,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: {python-version: "3.12"}
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - name: Install kustomize
         run: |
           curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz | tar xz
@@ -24,10 +24,10 @@ jobs:
   action:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./
         with: {intents: "examples/*.yaml", format: all, output: rendered, repo_url: "https://github.com/${{ github.repository }}.git"}
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - name: Lint charts and render every platform
         run: |
           mkdir -p rendered/helm-out
@@ -45,5 +45,5 @@ jobs:
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             rendered/manifests rendered/helm-out rendered/argocd rendered/flux rendered/kustomize/*/base
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: {name: rendered, path: rendered}
